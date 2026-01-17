@@ -3,7 +3,7 @@ import { useSearch } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Camera, CameraOff, RefreshCw, Wifi, WifiOff, Smartphone } from 'lucide-react';
+import { Camera, CameraOff, RefreshCw, Wifi, WifiOff, Smartphone, CheckCircle } from 'lucide-react';
 import { PhoneCameraSender } from '@/lib/webrtcPhoneCamera';
 
 export default function PhoneCamera() {
@@ -16,6 +16,7 @@ export default function PhoneCamera() {
   
   const [isStreaming, setIsStreaming] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isConnectedToHost, setIsConnectedToHost] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
 
@@ -30,6 +31,18 @@ export default function PhoneCamera() {
 
     try {
       const sender = new PhoneCameraSender(roomId);
+      
+      // Set up connection callbacks
+      sender.onConnected(() => {
+        console.log('[PhoneCamera] Connected to host!');
+        setIsConnectedToHost(true);
+      });
+      
+      sender.onDisconnected(() => {
+        console.log('[PhoneCamera] Disconnected from host');
+        setIsConnectedToHost(false);
+      });
+      
       await sender.startSending();
       senderRef.current = sender;
 
@@ -57,6 +70,7 @@ export default function PhoneCamera() {
       videoRef.current.srcObject = null;
     }
     setIsStreaming(false);
+    setIsConnectedToHost(false);
   };
 
   const switchCamera = async () => {
@@ -70,6 +84,19 @@ export default function PhoneCamera() {
       }
     }
   };
+
+  // Check connection status periodically
+  useEffect(() => {
+    if (!isStreaming || !senderRef.current) return;
+    
+    const interval = setInterval(() => {
+      if (senderRef.current) {
+        setIsConnectedToHost(senderRef.current.isConnected());
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [isStreaming]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -102,17 +129,22 @@ export default function PhoneCamera() {
           <Smartphone className="w-6 h-6 text-blue-400" />
           <div>
             <h1 className="text-white font-semibold">EngageAI Camera</h1>
-            <p className="text-slate-400 text-xs">Room: {roomId.slice(0, 8)}...</p>
+            <p className="text-slate-400 text-xs">Room: {roomId.slice(0, 12)}...</p>
           </div>
         </div>
         <Badge 
-          variant={isStreaming ? 'default' : 'secondary'}
-          className={isStreaming ? 'bg-emerald-500' : ''}
+          variant={isConnectedToHost ? 'default' : isStreaming ? 'secondary' : 'outline'}
+          className={isConnectedToHost ? 'bg-emerald-500' : isStreaming ? 'bg-amber-500' : ''}
         >
-          {isStreaming ? (
+          {isConnectedToHost ? (
             <>
-              <Wifi className="w-3 h-3 mr-1" />
-              Streaming
+              <CheckCircle className="w-3 h-3 mr-1" />
+              Connected
+            </>
+          ) : isStreaming ? (
+            <>
+              <Wifi className="w-3 h-3 mr-1 animate-pulse" />
+              Waiting...
             </>
           ) : (
             <>
@@ -122,6 +154,23 @@ export default function PhoneCamera() {
           )}
         </Badge>
       </div>
+
+      {/* Connection Status Banner */}
+      {isStreaming && !isConnectedToHost && (
+        <div className="bg-amber-500/20 border-b border-amber-500/30 px-4 py-2">
+          <p className="text-amber-200 text-sm text-center">
+            📡 Waiting for dashboard to connect... Make sure the QR modal is open on your computer.
+          </p>
+        </div>
+      )}
+      
+      {isStreaming && isConnectedToHost && (
+        <div className="bg-emerald-500/20 border-b border-emerald-500/30 px-4 py-2">
+          <p className="text-emerald-200 text-sm text-center">
+            ✅ Connected! Your camera is streaming to the dashboard with face detection active.
+          </p>
+        </div>
+      )}
 
       {/* Video Preview */}
       <div className="flex-1 relative bg-black">
@@ -166,6 +215,18 @@ export default function PhoneCamera() {
             </div>
           </div>
         )}
+
+        {/* Live indicator */}
+        {isStreaming && (
+          <div className="absolute top-4 left-4">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${isConnectedToHost ? 'bg-red-500' : 'bg-slate-700'}`}>
+              <div className={`w-2 h-2 rounded-full ${isConnectedToHost ? 'bg-white animate-pulse' : 'bg-slate-400'}`} />
+              <span className="text-white text-sm font-medium">
+                {isConnectedToHost ? 'LIVE' : 'PREVIEW'}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Controls */}
@@ -198,6 +259,7 @@ export default function PhoneCamera() {
           <ol className="text-slate-400 text-sm space-y-1 list-decimal list-inside">
             <li>Tap "Start Streaming" above</li>
             <li>Allow camera access when prompted</li>
+            <li>Wait for "Connected" status</li>
             <li>Point your phone at the audience</li>
             <li>The dashboard will analyze engagement in real-time</li>
           </ol>

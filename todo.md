@@ -125,3 +125,21 @@
 - [x] Implement WebRTC direct connection for phone camera stream
 - [x] Enable face detection processing on phone camera video
 - [x] Test face detection with phone camera source
+
+### Critical Bug Fixes
+- [x] Fix phone camera video not displaying on computer
+- [x] Fix face detection overlay not showing on video
+- [x] Implement WebSocket signaling server for cross-device communication
+- [x] Update phone camera code to use WebSocket instead of BroadcastChannel
+- [x] Test end-to-end phone camera to face detection pipeline
+
+## Phase 13: Video Sources Page Redesign
+
+### User-Friendly Device Connection Interface
+- [x] Redesign Video Sources page with simple visual layout
+- [x] Add step-by-step wizard for connecting devices
+- [x] Add visual guides and examples for each device type
+- [x] Simplify IP camera connection with help section
+- [x] Add clear instructions in simple language (non-technical)
+- [x] Add device status indicators with clear icons
+- [x] Test the new interface for usability
