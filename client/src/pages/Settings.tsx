@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/_core/hooks/useAuth';
 import AppLayout from '@/components/AppLayout';
+import { PushoverSettings } from '@/components/PushoverSettings';
 
 export default function Settings() {
   const { user } = useAuth();
@@ -270,6 +271,9 @@ export default function Settings() {
               </Button>
             </div>
           </Card>
+
+          {/* Smartwatch Alerts */}
+          <PushoverSettings />
 
           {/* Info Card */}
           <Card className="p-5 bg-muted/30">

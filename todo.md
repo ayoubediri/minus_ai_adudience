@@ -75,3 +75,41 @@
 - [x] Create movement tracking for minimal movement detection
 - [x] Calculate real engagement scores based on detected indicators
 - [x] Test with live camera feed
+
+## Phase 11: Fidget Index Implementation (New Request)
+
+### Face Detection with face-api.js
+- [x] Install face-api.js library
+- [x] Download and setup face detection models (tiny_face_detector, face_landmark_68, face_expression)
+- [x] Create FaceDetector class with emotion recognition
+- [x] Implement MAR (Mouth Aspect Ratio) for yawning detection
+- [x] Implement head pitch calculation for looking down detection
+- [x] Draw colored bounding boxes around faces (green/yellow/red based on engagement)
+- [x] Show engagement percentage above each face
+
+### Phone Camera Linking via QR Code
+- [x] Install qrcode library
+- [x] Implement vdo.ninja integration for phone camera streaming
+- [x] Create PhoneCameraModal component with QR code display
+- [x] Add "Link Phone" button to Live Monitor
+- [x] Handle phone camera stream connection
+
+### Smartwatch Alerts via Pushover
+- [x] Add Pushover API integration
+- [x] Create settings UI for Pushover credentials (user key, API token)
+- [x] Send alerts to smartwatch when engagement drops
+- [x] Support critical and warning alert levels
+
+### Dark Theme UI Redesign
+- [x] Implement dark theme color palette
+- [x] Create gradient engagement bar (red → yellow → green)
+- [x] Add pulse animation for critical alerts
+- [x] Redesign Live Monitor with 70% video area
+- [x] Add live alert feed showing individual events
+- [x] Show face counters (engaged/neutral/bored)
+
+### Alert System Improvements
+- [x] Add alert cooldown (30 seconds between alerts)
+- [x] Implement multi-level alerts (critical < 40%, warning < 60%)
+- [x] Add sound alerts with different frequencies for alert levels
+- [x] Improve vibration patterns for different alert levels

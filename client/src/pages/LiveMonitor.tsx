@@ -33,6 +33,8 @@ import {
 import { toast } from 'sonner';
 import { useVideoProcessor } from '@/hooks/useVideoProcessor';
 import AppLayout from '@/components/AppLayout';
+import { PhoneCameraModal } from '@/components/PhoneCameraModal';
+import { alertManager, AlertEvent } from '@/lib/alertManager';
 
 export default function LiveMonitor() {
   const params = useParams<{ sessionId: string }>();
@@ -48,6 +50,9 @@ export default function LiveMonitor() {
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [selectedSource, setSelectedSource] = useState('webcam');
   const [lastAlertTime, setLastAlertTime] = useState(0);
+  const [showPhoneCameraModal, setShowPhoneCameraModal] = useState(false);
+  const [alertHistory, setAlertHistory] = useState<AlertEvent[]>([]);
+  const phoneCameraIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const { data: session } = trpc.sessions.getById.useQuery(
     { sessionId },
@@ -288,17 +293,28 @@ export default function LiveMonitor() {
 
               {/* Video source selector */}
               <div className="p-4 border-t border-border bg-muted/30">
-                <div className="flex items-center gap-4">
-                  <Label className="text-sm font-medium">Video Source:</Label>
-                  <Select value={selectedSource} onValueChange={setSelectedSource}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="webcam">Built-in Webcam</SelectItem>
-                      <SelectItem value="external">External Camera</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Label className="text-sm font-medium">Video Source:</Label>
+                    <Select value={selectedSource} onValueChange={setSelectedSource}>
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="webcam">Built-in Webcam</SelectItem>
+                        <SelectItem value="external">External Camera</SelectItem>
+                        <SelectItem value="phone">Phone Camera</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPhoneCameraModal(true)}
+                  >
+                    <Smartphone className="w-4 h-4 mr-2" />
+                    Link Phone
+                  </Button>
                 </div>
               </div>
             </Card>
@@ -466,10 +482,10 @@ export default function LiveMonitor() {
                         </Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                        <div>Score: {Math.round(face.engagementScore)}%</div>
+                        <div>Score: {Math.round(face.engagement)}%</div>
                         <div>Head: {face.isLookingDown ? '👇 Down' : '👀 Forward'}</div>
                         <div>{face.isYawning ? '😴 Yawning' : '✓ Alert'}</div>
-                        <div>{face.isSlumped ? '🪑 Slumped' : '✓ Upright'}</div>
+                        <div>{'expressions' in face ? '✓ Detected' : '✓ Upright'}</div>
                       </div>
                     </div>
                   ))}
@@ -497,6 +513,17 @@ export default function LiveMonitor() {
           </div>
         </div>
       </div>
+
+      {/* Phone Camera Modal */}
+      <PhoneCameraModal
+        isOpen={showPhoneCameraModal}
+        onClose={() => setShowPhoneCameraModal(false)}
+        onConnect={(viewUrl) => {
+          setShowPhoneCameraModal(false);
+          setSelectedSource('phone');
+          toast.success('Phone camera linked! You can now use it as a video source.');
+        }}
+      />
     </AppLayout>
   );
 }

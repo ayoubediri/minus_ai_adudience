@@ -254,3 +254,104 @@
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/30;
 }
+
+/* Engagement bar gradient */
+.engagement-bar {
+  height: 40px;
+  border-radius: 20px;
+  background: linear-gradient(
+    to right,
+    oklch(0.63 0.22 25) 0%,
+    oklch(0.8 0.15 85) 50%,
+    oklch(0.72 0.19 145) 100%
+  );
+  position: relative;
+  overflow: hidden;
+}
+
+.engagement-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.15) 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+}
+
+.engagement-indicator {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border-radius: 50%;
+  top: 8px;
+  transition: left 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Alert feed styling */
+.alert-feed {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.alert-feed-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.alert-feed-item.critical {
+  @apply bg-red-500/10 border-l-4 border-red-500;
+}
+
+.alert-feed-item.warning {
+  @apply bg-amber-500/10 border-l-4 border-amber-500;
+}
+
+.alert-feed-item.info {
+  @apply bg-blue-500/10 border-l-4 border-blue-500;
+}
+
+/* Face detection overlay colors */
+.face-engaged {
+  border-color: oklch(0.72 0.19 145);
+  background-color: rgba(81, 207, 102, 0.15);
+}
+
+.face-neutral {
+  border-color: oklch(0.8 0.15 85);
+  background-color: rgba(255, 212, 59, 0.15);
+}
+
+.face-bored {
+  border-color: oklch(0.63 0.22 25);
+  background-color: rgba(255, 107, 107, 0.15);
+}
+
+/* QR Code container */
+.qr-container {
+  background: white;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  display: inline-block;
+}
+
+/* Glow effects */
+.glow-engaged {
+  box-shadow: 0 0 20px oklch(0.72 0.19 145 / 0.3);
+}
+
+.glow-warning {
+  box-shadow: 0 0 20px oklch(0.8 0.15 85 / 0.3);
+}
+
+.glow-danger {
+  box-shadow: 0 0 20px oklch(0.63 0.22 25 / 0.3);
+}
