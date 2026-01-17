@@ -63,7 +63,7 @@ export default function LiveMonitor() {
     },
   });
 
-  const { metrics, isProcessing, startProcessing, stopProcessing } = useVideoProcessor();
+  const { metrics, isProcessing, isModelLoaded, startProcessing, stopProcessing } = useVideoProcessor();
 
   // Trigger alert
   const triggerAlert = useCallback((boredomPercentage: number) => {
@@ -241,10 +241,13 @@ export default function LiveMonitor() {
                     <p className="text-sm text-white/60 mb-6">
                       Click the button below to start monitoring
                     </p>
-                    <Button size="lg" onClick={startCamera}>
+                    <Button size="lg" onClick={startCamera} disabled={!isModelLoaded}>
                       <Camera className="w-5 h-5 mr-2" />
-                      Start Camera
+                      {isModelLoaded ? 'Start Camera' : 'Loading AI Models...'}
                     </Button>
+                    {!isModelLoaded && (
+                      <p className="text-xs text-white/40 mt-3">Loading face detection models...</p>
+                    )}
                   </div>
                 )}
 
@@ -440,16 +443,54 @@ export default function LiveMonitor() {
               </div>
             </Card>
 
+            {/* Detection Indicators */}
+            {isProcessing && metrics.faces.length > 0 && (
+              <Card className="p-5">
+                <h3 className="font-semibold mb-4">Detection Details</h3>
+                <div className="space-y-3 max-h-48 overflow-y-auto">
+                  {metrics.faces.map((face, idx) => (
+                    <div key={idx} className="p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Person {idx + 1}</span>
+                        <Badge
+                          variant="outline"
+                          className={
+                            face.emotionLabel === 'engaged'
+                              ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                              : face.emotionLabel === 'bored'
+                              ? 'bg-red-100 text-red-700 border-red-200'
+                              : 'bg-amber-100 text-amber-700 border-amber-200'
+                          }
+                        >
+                          {face.emotionLabel}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                        <div>Score: {Math.round(face.engagementScore)}%</div>
+                        <div>Head: {face.isLookingDown ? '👇 Down' : '👀 Forward'}</div>
+                        <div>{face.isYawning ? '😴 Yawning' : '✓ Alert'}</div>
+                        <div>{face.isSlumped ? '🪑 Slumped' : '✓ Upright'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
             {/* Processing Status */}
             <Card className="p-4">
               <div className="flex items-center gap-3">
                 <div
                   className={`w-3 h-3 rounded-full ${
-                    isProcessing ? 'bg-emerald-500' : 'bg-amber-500'
+                    isProcessing ? 'bg-emerald-500 animate-pulse' : isModelLoaded ? 'bg-amber-500' : 'bg-slate-400'
                   }`}
                 />
                 <span className="text-sm">
-                  {isProcessing ? 'AI Processing Active' : 'Waiting for camera'}
+                  {isProcessing 
+                    ? 'AI Processing Active' 
+                    : isModelLoaded 
+                    ? 'Waiting for camera' 
+                    : 'Loading AI models...'}
                 </span>
               </div>
             </Card>
