@@ -15,9 +15,17 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Play, Square, Calendar, TrendingUp } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Plus, Play, Square, TrendingUp, Clock, Users, MoreHorizontal, BarChart3 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
+import AppLayout from '@/components/AppLayout';
 
 export default function Sessions() {
   const [, setLocation] = useLocation();
@@ -58,53 +66,60 @@ export default function Sessions() {
       toast.error('Please enter a session title');
       return;
     }
-
     createSessionMutation.mutate(newSession);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'live':
-        return 'bg-green-500';
+        return { color: 'bg-emerald-500', text: 'Live', textColor: 'text-emerald-700' };
       case 'completed':
-        return 'bg-gray-500';
+        return { color: 'bg-slate-400', text: 'Completed', textColor: 'text-slate-600' };
       case 'scheduled':
-        return 'bg-blue-500';
+        return { color: 'bg-blue-500', text: 'Ready', textColor: 'text-blue-700' };
       case 'cancelled':
-        return 'bg-red-500';
+        return { color: 'bg-red-500', text: 'Cancelled', textColor: 'text-red-700' };
       default:
-        return 'bg-gray-500';
+        return { color: 'bg-slate-400', text: status, textColor: 'text-slate-600' };
     }
   };
 
+  // Calculate stats
+  const totalSessions = sessions?.length || 0;
+  const liveSessions = sessions?.filter(s => s.status === 'live').length || 0;
+  const completedSessions = sessions?.filter(s => s.status === 'completed').length || 0;
+
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="container mx-auto max-w-6xl">
-        <div className="flex items-center justify-between mb-6">
+    <AppLayout>
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold mb-2">My Sessions</h1>
-            <p className="text-muted-foreground">Manage your presentation sessions</p>
+            <h1 className="text-2xl font-bold text-foreground">Sessions</h1>
+            <p className="text-muted-foreground mt-1">
+              Manage and monitor your presentation sessions
+            </p>
           </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button size="lg" className="shadow-sm">
                 <Plus className="w-4 h-4 mr-2" />
                 New Session
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Create New Session</DialogTitle>
                 <DialogDescription>
-                  Set up a new presentation or meeting session
+                  Set up a new presentation or meeting session for audience monitoring
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-5 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
+                  <Label htmlFor="title">Session Title</Label>
                   <Input
                     id="title"
-                    placeholder="e.g., Marketing Presentation Q1"
+                    placeholder="e.g., Q1 Marketing Presentation"
                     value={newSession.title}
                     onChange={(e) =>
                       setNewSession({ ...newSession, title: e.target.value })
@@ -120,25 +135,28 @@ export default function Sessions() {
                     onChange={(e) =>
                       setNewSession({ ...newSession, description: e.target.value })
                     }
+                    rows={3}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="threshold">Alert Threshold (%)</Label>
-                  <Input
-                    id="threshold"
-                    type="number"
-                    min="10"
-                    max="90"
-                    value={newSession.alertThreshold}
-                    onChange={(e) =>
-                      setNewSession({
-                        ...newSession,
-                        alertThreshold: parseInt(e.target.value) || 40,
-                      })
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Alert Threshold</Label>
+                    <span className="text-sm font-medium text-primary">
+                      {newSession.alertThreshold}%
+                    </span>
+                  </div>
+                  <Slider
+                    value={[newSession.alertThreshold]}
+                    onValueChange={(value) =>
+                      setNewSession({ ...newSession, alertThreshold: value[0] })
                     }
+                    min={10}
+                    max={90}
+                    step={5}
+                    className="w-full"
                   />
-                  <p className="text-sm text-muted-foreground">
-                    Alert when this percentage of audience appears disengaged
+                  <p className="text-xs text-muted-foreground">
+                    You'll receive an alert when this percentage of the audience appears disengaged
                   </p>
                 </div>
               </div>
@@ -153,19 +171,59 @@ export default function Sessions() {
                   onClick={handleCreateSession}
                   disabled={createSessionMutation.isPending}
                 >
-                  Create Session
+                  {createSessionMutation.isPending ? 'Creating...' : 'Create Session'}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
 
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <Card className="p-5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Clock className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Sessions</p>
+                <p className="text-2xl font-bold">{totalSessions}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                <Users className="w-6 h-6 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Live Now</p>
+                <p className="text-2xl font-bold">{liveSessions}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Completed</p>
+                <p className="text-2xl font-bold">{completedSessions}</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Sessions List */}
         {!sessions || sessions.length === 0 ? (
           <Card className="p-12 text-center">
-            <Calendar className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-8 h-8 text-muted-foreground" />
+            </div>
             <h3 className="text-xl font-semibold mb-2">No sessions yet</h3>
-            <p className="text-muted-foreground mb-6">
-              Create your first session to start monitoring audience engagement
+            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+              Create your first session to start monitoring audience engagement in real-time
             </p>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
@@ -173,90 +231,126 @@ export default function Sessions() {
             </Button>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sessions.map((session) => (
-              <Card key={session.id} className="p-6 hover:shadow-lg transition-shadow">
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg mb-1">{session.title}</h3>
-                      {session.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {session.description}
-                        </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {sessions.map((session) => {
+              const statusConfig = getStatusConfig(session.status);
+              return (
+                <Card
+                  key={session.id}
+                  className="p-5 hover:shadow-md transition-shadow duration-200"
+                >
+                  <div className="space-y-4">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span
+                            className={`w-2 h-2 rounded-full ${statusConfig.color}`}
+                          />
+                          <span className={`text-xs font-medium ${statusConfig.textColor}`}>
+                            {statusConfig.text}
+                          </span>
+                        </div>
+                        <h3 className="font-semibold text-lg truncate">
+                          {session.title}
+                        </h3>
+                        {session.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                            {session.description}
+                          </p>
+                        )}
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => setLocation(`/analytics/${session.id}`)}
+                          >
+                            View Analytics
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>Edit Session</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive">
+                            Delete Session
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-foreground">
+                          {session.alertThreshold}%
+                        </span>
+                        <span>threshold</span>
+                      </div>
+                      {session.startTime && (
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>
+                            {new Date(session.startTime).toLocaleDateString()}
+                          </span>
+                        </div>
                       )}
                     </div>
-                    <Badge className={getStatusColor(session.status)}>
-                      {session.status}
-                    </Badge>
-                  </div>
 
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Alert Threshold</span>
-                      <span className="font-medium">{session.alertThreshold}%</span>
-                    </div>
-                    {session.startTime && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Started</span>
-                        <span className="font-medium">
-                          {new Date(session.startTime).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    {session.status === 'scheduled' && (
-                      <Button
-                        className="flex-1"
-                        size="sm"
-                        onClick={() => startSessionMutation.mutate({ sessionId: session.id })}
-                        disabled={startSessionMutation.isPending}
-                      >
-                        <Play className="w-4 h-4 mr-2" />
-                        Start
-                      </Button>
-                    )}
-                    {session.status === 'live' && (
-                      <>
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-2">
+                      {session.status === 'scheduled' && (
                         <Button
                           className="flex-1"
-                          size="sm"
-                          onClick={() => setLocation(`/monitor/${session.id}`)}
+                          onClick={() =>
+                            startSessionMutation.mutate({ sessionId: session.id })
+                          }
+                          disabled={startSessionMutation.isPending}
                         >
-                          <TrendingUp className="w-4 h-4 mr-2" />
-                          Monitor
+                          <Play className="w-4 h-4 mr-2" />
+                          Start Session
                         </Button>
+                      )}
+                      {session.status === 'live' && (
+                        <>
+                          <Button
+                            className="flex-1"
+                            onClick={() => setLocation(`/monitor/${session.id}`)}
+                          >
+                            <TrendingUp className="w-4 h-4 mr-2" />
+                            Monitor
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() =>
+                              endSessionMutation.mutate({ sessionId: session.id })
+                            }
+                            disabled={endSessionMutation.isPending}
+                          >
+                            <Square className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                      {session.status === 'completed' && (
                         <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => endSessionMutation.mutate({ sessionId: session.id })}
-                          disabled={endSessionMutation.isPending}
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setLocation(`/analytics/${session.id}`)}
                         >
-                          <Square className="w-4 h-4 mr-2" />
-                          End
+                          <BarChart3 className="w-4 h-4 mr-2" />
+                          View Report
                         </Button>
-                      </>
-                    )}
-                    {session.status === 'completed' && (
-                      <Button
-                        className="flex-1"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setLocation(`/analytics/${session.id}`)}
-                      >
-                        <TrendingUp className="w-4 h-4 mr-2" />
-                        View Report
-                      </Button>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
-    </div>
+    </AppLayout>
   );
 }

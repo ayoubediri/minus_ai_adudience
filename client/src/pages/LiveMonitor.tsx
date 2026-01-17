@@ -1,66 +1,109 @@
-import { useEffect, useRef, useState } from 'react';
-import { useVideoProcessor } from '@/hooks/useVideoProcessor';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useParams, useLocation } from 'wouter';
 import { trpc } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { Video, VideoOff, AlertTriangle, Users } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Camera,
+  CameraOff,
+  AlertTriangle,
+  Users,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  ArrowLeft,
+  Settings,
+  Volume2,
+  VolumeX,
+  Smartphone,
+  Square,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import { useVideoProcessor } from '@/hooks/useVideoProcessor';
+import AppLayout from '@/components/AppLayout';
 
-interface LiveMonitorProps {
-  sessionId: number;
-}
+export default function LiveMonitor() {
+  const params = useParams<{ sessionId: string }>();
+  const sessionId = parseInt(params.sessionId || '0');
+  const [, setLocation] = useLocation();
 
-export default function LiveMonitor({ sessionId }: LiveMonitorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [threshold, setThreshold] = useState(40);
-  const [lastAlertTime, setLastAlertTime] = useState<number>(0);
 
-  const { metrics, isProcessing, startProcessing, stopProcessing } = useVideoProcessor();
-  const updateThresholdMutation = trpc.sessions.updateThreshold.useMutation();
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [alertThreshold, setAlertThreshold] = useState(40);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  const [selectedSource, setSelectedSource] = useState('webcam');
+  const [lastAlertTime, setLastAlertTime] = useState(0);
+
+  const { data: session } = trpc.sessions.getById.useQuery(
+    { sessionId },
+    { enabled: sessionId > 0 }
+  );
+
   const recordEngagementMutation = trpc.engagement.record.useMutation();
   const createAlertMutation = trpc.alerts.create.useMutation();
+  const endSessionMutation = trpc.sessions.endSession.useMutation({
+    onSuccess: () => {
+      toast.success('Session ended');
+      setLocation('/sessions');
+    },
+  });
 
-  // Start webcam
-  const startWebcam = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
-        audio: false,
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        await videoRef.current.play();
-        setStream(mediaStream);
-        
-        // Start processing after video is ready
-        if (canvasRef.current) {
-          startProcessing(videoRef.current, canvasRef.current);
-        }
-        
-        toast.success('Camera started');
-      }
-    } catch (error) {
-      console.error('Error accessing webcam:', error);
-      toast.error('Failed to access camera');
+  const { metrics, isProcessing, startProcessing, stopProcessing } = useVideoProcessor();
+
+  // Trigger alert
+  const triggerAlert = useCallback((boredomPercentage: number) => {
+    toast.error(`Alert: ${boredomPercentage.toFixed(0)}% of audience appears disengaged!`, {
+      duration: 5000,
+    });
+
+    if (vibrationEnabled && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 200]);
     }
-  };
 
-  // Stop webcam
-  const stopWebcam = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-      stopProcessing();
-      toast.info('Camera stopped');
+    if (soundEnabled) {
+      const audio = new Audio('/alert-sound.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(() => {});
     }
-  };
 
-  // Record engagement data periodically
+    // Record alert
+    createAlertMutation.mutate({
+      sessionId,
+      userId: 0,
+      alertType: 'threshold_breach',
+      boredomPercentage,
+      message: `Boredom threshold exceeded: ${boredomPercentage.toFixed(0)}%`,
+      deliveryChannels: JSON.stringify(['vibration', 'sound', 'visual']),
+    });
+  }, [vibrationEnabled, soundEnabled, sessionId, createAlertMutation]);
+
+  // Check for alerts
+  useEffect(() => {
+    if (!isProcessing || metrics.totalFaces === 0) return;
+
+    const now = Date.now();
+    if (metrics.boredomPercentage >= alertThreshold && now - lastAlertTime > 30000) {
+      triggerAlert(metrics.boredomPercentage);
+      setLastAlertTime(now);
+    }
+  }, [metrics.boredomPercentage, alertThreshold, isProcessing, metrics.totalFaces, lastAlertTime, triggerAlert]);
+
+  // Record engagement data
   useEffect(() => {
     if (!isProcessing || metrics.totalFaces === 0) return;
 
@@ -75,245 +118,344 @@ export default function LiveMonitor({ sessionId }: LiveMonitorProps) {
         boredomPercentage: metrics.boredomPercentage,
         averageEngagementScore: metrics.averageEngagementScore,
       });
-    }, 5000); // Record every 5 seconds
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, [isProcessing, metrics, sessionId]);
+  }, [isProcessing, metrics, sessionId, recordEngagementMutation]);
 
-  // Check for threshold breach and trigger alerts
-  useEffect(() => {
-    if (!isProcessing || metrics.totalFaces === 0) return;
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720, facingMode: 'user' },
+        audio: false,
+      });
 
-    const now = Date.now();
-    const timeSinceLastAlert = now - lastAlertTime;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setIsStreaming(true);
 
-    // Only alert if threshold breached and at least 30 seconds since last alert
-    if (metrics.boredomPercentage >= threshold && timeSinceLastAlert > 30000) {
-      setLastAlertTime(now);
-      
-      // Trigger vibration if supported
-      if ('vibrate' in navigator) {
-        navigator.vibrate([200, 100, 200]);
+        if (canvasRef.current) {
+          startProcessing(videoRef.current, canvasRef.current);
+        }
+        toast.success('Camera started');
       }
-      
-      // Play alert sound
-      const audio = new Audio('/alert-sound.mp3');
-      audio.play().catch(() => {
-        // Fallback if audio fails
-        console.log('Audio playback failed');
-      });
-      
-      // Show toast notification
-      toast.error(`Alert: ${Math.round(metrics.boredomPercentage)}% of audience appears disengaged!`, {
-        duration: 5000,
-      });
-      
-      // Record alert in database
-      createAlertMutation.mutate({
-        sessionId,
-        userId: 0, // Will be set by server from context
-        alertType: 'threshold_breach',
-        boredomPercentage: metrics.boredomPercentage,
-        message: `Boredom threshold exceeded: ${Math.round(metrics.boredomPercentage)}%`,
-        deliveryChannels: JSON.stringify(['vibration', 'sound', 'visual']),
-      });
+    } catch (error) {
+      toast.error('Failed to access camera. Please check permissions.');
+      console.error('Camera error:', error);
     }
-  }, [metrics.boredomPercentage, threshold, isProcessing, metrics.totalFaces]);
+  };
 
-  // Update threshold
-  const handleThresholdChange = (value: number[]) => {
-    const newThreshold = value[0];
-    setThreshold(newThreshold);
-    updateThresholdMutation.mutate({
-      sessionId,
-      threshold: newThreshold,
-    });
+  const stopCamera = () => {
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    stopProcessing();
+    setIsStreaming(false);
+    toast.info('Camera stopped');
   };
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopWebcam();
+      stopCamera();
     };
   }, []);
 
+  const getEngagementColor = (percentage: number) => {
+    if (percentage >= 70) return 'text-emerald-600';
+    if (percentage >= 40) return 'text-amber-600';
+    return 'text-red-600';
+  };
+
+  const getBoredomColor = (percentage: number) => {
+    if (percentage < 30) return 'text-emerald-600';
+    if (percentage < 50) return 'text-amber-600';
+    return 'text-red-600';
+  };
+
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="container mx-auto max-w-7xl">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Live Audience Monitoring</h1>
-          <p className="text-muted-foreground">Real-time engagement analysis and alerts</p>
+    <AppLayout>
+      <div className="p-6 lg:p-8 max-w-[1800px] mx-auto">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation('/sessions')}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                {session?.title || 'Live Monitor'}
+              </h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-sm text-muted-foreground">Live Session</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setLocation(`/analytics/${sessionId}`)}
+            >
+              View Analytics
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => endSessionMutation.mutate({ sessionId })}
+              disabled={endSessionMutation.isPending}
+            >
+              <Square className="w-4 h-4 mr-2" />
+              End Session
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Video Feed */}
-          <div className="lg:col-span-2 space-y-4">
-            <Card className="p-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold">Camera Feed</h2>
-                  <div className="flex gap-2">
-                    {!stream ? (
-                      <Button onClick={startWebcam} size="sm">
-                        <Video className="w-4 h-4 mr-2" />
-                        Start Camera
-                      </Button>
-                    ) : (
-                      <Button onClick={stopWebcam} variant="destructive" size="sm">
-                        <VideoOff className="w-4 h-4 mr-2" />
-                        Stop Camera
-                      </Button>
-                    )}
-                  </div>
-                </div>
+          <div className="xl:col-span-2 space-y-4">
+            <Card className="overflow-hidden">
+              <div className="relative aspect-video bg-slate-900">
+                <video
+                  ref={videoRef}
+                  className="absolute inset-0 w-full h-full object-cover hidden"
+                  playsInline
+                  muted
+                  autoPlay
+                />
+                <canvas
+                  ref={canvasRef}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
 
-                <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-                  <video
-                    ref={videoRef}
-                    className="absolute inset-0 w-full h-full object-cover hidden"
-                    autoPlay
-                    playsInline
-                    muted
-                  />
-                  <canvas
-                    ref={canvasRef}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                  {!stream && (
-                    <div className="absolute inset-0 flex items-center justify-center text-white">
-                      <div className="text-center">
-                        <Video className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg">Click "Start Camera" to begin monitoring</p>
-                      </div>
+                {!isStreaming && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                    <Camera className="w-16 h-16 mb-4 opacity-50" />
+                    <p className="text-lg font-medium mb-2">Camera not active</p>
+                    <p className="text-sm text-white/60 mb-6">
+                      Click the button below to start monitoring
+                    </p>
+                    <Button size="lg" onClick={startCamera}>
+                      <Camera className="w-5 h-5 mr-2" />
+                      Start Camera
+                    </Button>
+                  </div>
+                )}
+
+                {/* Overlay controls */}
+                {isStreaming && (
+                  <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+                    <Badge
+                      variant="secondary"
+                      className="bg-black/60 text-white border-0"
+                    >
+                      <Users className="w-3 h-3 mr-1" />
+                      {metrics.totalFaces} detected
+                    </Badge>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="bg-black/60 hover:bg-black/80 text-white border-0"
+                      onClick={stopCamera}
+                    >
+                      <CameraOff className="w-4 h-4 mr-2" />
+                      Stop
+                    </Button>
+                  </div>
+                )}
+
+                {/* Alert overlay */}
+                {isStreaming && metrics.boredomPercentage >= alertThreshold && metrics.totalFaces > 0 && (
+                  <div className="absolute top-4 left-4 right-4">
+                    <div className="bg-red-500/90 text-white px-4 py-3 rounded-lg flex items-center gap-3 animate-pulse-alert">
+                      <AlertTriangle className="w-5 h-5" />
+                      <span className="font-medium">
+                        High disengagement detected: {metrics.boredomPercentage.toFixed(0)}%
+                      </span>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+
+              {/* Video source selector */}
+              <div className="p-4 border-t border-border bg-muted/30">
+                <div className="flex items-center gap-4">
+                  <Label className="text-sm font-medium">Video Source:</Label>
+                  <Select value={selectedSource} onValueChange={setSelectedSource}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="webcam">Built-in Webcam</SelectItem>
+                      <SelectItem value="external">External Camera</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </Card>
+          </div>
 
-            {/* Alert Threshold Control */}
-            <Card className="p-6">
+          {/* Metrics & Controls */}
+          <div className="space-y-4">
+            {/* Engagement Score */}
+            <Card className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Engagement Score</h3>
+                <Badge variant="outline" className={getEngagementColor(metrics.averageEngagementScore)}>
+                  {metrics.averageEngagementScore >= 70 ? (
+                    <TrendingUp className="w-3 h-3 mr-1" />
+                  ) : metrics.averageEngagementScore >= 40 ? (
+                    <Minus className="w-3 h-3 mr-1" />
+                  ) : (
+                    <TrendingDown className="w-3 h-3 mr-1" />
+                  )}
+                  {metrics.averageEngagementScore >= 70
+                    ? 'Good'
+                    : metrics.averageEngagementScore >= 40
+                    ? 'Fair'
+                    : 'Low'}
+                </Badge>
+              </div>
+              <div className="text-center mb-4">
+                <span className={`text-5xl font-bold ${getEngagementColor(metrics.averageEngagementScore)}`}>
+                  {Math.round(metrics.averageEngagementScore)}
+                </span>
+                <span className="text-2xl text-muted-foreground">%</span>
+              </div>
+              <Progress
+                value={metrics.averageEngagementScore}
+                className="h-2"
+              />
+            </Card>
+
+            {/* Audience Breakdown */}
+            <Card className="p-5">
+              <h3 className="font-semibold mb-4">Audience Breakdown</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Alert Threshold</h3>
-                  <Badge variant="outline" className="text-lg">
-                    {threshold}%
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-emerald-500" />
+                    <span className="text-sm">Engaged</span>
+                  </div>
+                  <span className="font-semibold text-emerald-600">
+                    {metrics.engagedCount}
+                  </span>
                 </div>
-                <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-amber-500" />
+                    <span className="text-sm">Neutral</span>
+                  </div>
+                  <span className="font-semibold text-amber-600">
+                    {metrics.neutralCount}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-500" />
+                    <span className="text-sm">Disengaged</span>
+                  </div>
+                  <span className="font-semibold text-red-600">
+                    {metrics.boredCount}
+                  </span>
+                </div>
+              </div>
+
+              {/* Boredom percentage */}
+              <div className="mt-6 pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Disengagement Rate</span>
+                  <span className={`font-bold ${getBoredomColor(metrics.boredomPercentage)}`}>
+                    {Math.round(metrics.boredomPercentage)}%
+                  </span>
+                </div>
+                <Progress
+                  value={metrics.boredomPercentage}
+                  className="h-2"
+                />
+              </div>
+            </Card>
+
+            {/* Alert Settings */}
+            <Card className="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Settings className="w-4 h-4 text-muted-foreground" />
+                <h3 className="font-semibold">Alert Settings</h3>
+              </div>
+
+              <div className="space-y-5">
+                {/* Threshold */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Alert Threshold</Label>
+                    <span className="text-sm font-medium text-primary">
+                      {alertThreshold}%
+                    </span>
+                  </div>
                   <Slider
-                    value={[threshold]}
-                    onValueChange={handleThresholdChange}
+                    value={[alertThreshold]}
+                    onValueChange={(value) => setAlertThreshold(value[0])}
                     min={10}
                     max={90}
                     step={5}
-                    className="w-full"
                   />
-                  <p className="text-sm text-muted-foreground">
-                    Alert when {threshold}% or more of the audience appears disengaged
+                  <p className="text-xs text-muted-foreground">
+                    Alert when disengagement exceeds this level
                   </p>
                 </div>
-              </div>
-            </Card>
-          </div>
 
-          {/* Metrics Panel */}
-          <div className="space-y-4">
-            {/* Overall Metrics */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <Users className="w-5 h-5 mr-2" />
-                Audience Overview
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-muted-foreground">Total Faces</span>
-                    <span className="text-2xl font-bold">{metrics.totalFaces}</span>
+                {/* Sound toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {soundEnabled ? (
+                      <Volume2 className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <VolumeX className="w-4 h-4 text-muted-foreground" />
+                    )}
+                    <Label className="text-sm">Sound Alerts</Label>
                   </div>
+                  <Switch
+                    checked={soundEnabled}
+                    onCheckedChange={setSoundEnabled}
+                  />
                 </div>
 
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-muted-foreground">Engagement Score</span>
-                    <span className="text-2xl font-bold">
-                      {Math.round(metrics.averageEngagementScore)}%
-                    </span>
+                {/* Vibration toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="w-4 h-4 text-muted-foreground" />
+                    <Label className="text-sm">Vibration</Label>
                   </div>
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${metrics.averageEngagementScore}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-muted-foreground">Boredom Level</span>
-                    <span className={`text-2xl font-bold ${
-                      metrics.boredomPercentage >= threshold ? 'text-destructive animate-pulse-alert' : ''
-                    }`}>
-                      {Math.round(metrics.boredomPercentage)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        metrics.boredomPercentage >= threshold ? 'bg-destructive' : 'bg-yellow-500'
-                      }`}
-                      style={{ width: `${metrics.boredomPercentage}%` }}
-                    />
-                  </div>
+                  <Switch
+                    checked={vibrationEnabled}
+                    onCheckedChange={setVibrationEnabled}
+                  />
                 </div>
               </div>
             </Card>
 
-            {/* Detailed Breakdown */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Engagement Breakdown</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm flex items-center">
-                    <span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                    Engaged
-                  </span>
-                  <span className="font-semibold status-engaged">{metrics.engagedCount}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm flex items-center">
-                    <span className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></span>
-                    Neutral
-                  </span>
-                  <span className="font-semibold status-neutral">{metrics.neutralCount}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm flex items-center">
-                    <span className="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-                    Bored
-                  </span>
-                  <span className="font-semibold status-bored">{metrics.boredCount}</span>
-                </div>
+            {/* Processing Status */}
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    isProcessing ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}
+                />
+                <span className="text-sm">
+                  {isProcessing ? 'AI Processing Active' : 'Waiting for camera'}
+                </span>
               </div>
             </Card>
-
-            {/* Alert Status */}
-            {metrics.boredomPercentage >= threshold && metrics.totalFaces > 0 && (
-              <Card className="p-6 border-destructive bg-destructive/10">
-                <div className="flex items-start space-x-3">
-                  <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 animate-pulse" />
-                  <div>
-                    <h3 className="font-semibold text-destructive mb-1">Alert Active</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Audience engagement is below threshold. Consider adjusting your presentation.
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            )}
           </div>
         </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }
