@@ -175,3 +175,29 @@
     }
   }
 }
+/* Engagement status colors */
+.status-engaged {
+  @apply text-green-600 dark:text-green-400;
+}
+
+.status-neutral {
+  @apply text-yellow-600 dark:text-yellow-400;
+}
+
+.status-bored {
+  @apply text-red-600 dark:text-red-400;
+}
+
+/* Animation for pulse effect on alerts */
+@keyframes pulse-alert {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-alert {
+  animation: pulse-alert 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
