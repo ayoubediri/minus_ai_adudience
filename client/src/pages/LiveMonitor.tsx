@@ -29,12 +29,12 @@ import {
   VolumeX,
   Smartphone,
   Square,
+  Unlink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useVideoProcessor } from '@/hooks/useVideoProcessor';
 import AppLayout from '@/components/AppLayout';
 import { PhoneCameraModal } from '@/components/PhoneCameraModal';
-import { alertManager, AlertEvent } from '@/lib/alertManager';
 
 export default function LiveMonitor() {
   const params = useParams<{ sessionId: string }>();
@@ -42,17 +42,18 @@ export default function LiveMonitor() {
   const [, setLocation] = useLocation();
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const phoneVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [isStreaming, setIsStreaming] = useState(false);
   const [alertThreshold, setAlertThreshold] = useState(40);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
-  const [selectedSource, setSelectedSource] = useState('webcam');
+  const [selectedSource, setSelectedSource] = useState<'webcam' | 'phone'>('webcam');
   const [lastAlertTime, setLastAlertTime] = useState(0);
   const [showPhoneCameraModal, setShowPhoneCameraModal] = useState(false);
-  const [alertHistory, setAlertHistory] = useState<AlertEvent[]>([]);
-  const phoneCameraIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [phoneStream, setPhoneStream] = useState<MediaStream | null>(null);
+  const [isPhoneConnected, setIsPhoneConnected] = useState(false);
 
   const { data: session } = trpc.sessions.getById.useQuery(
     { sessionId },
@@ -139,6 +140,7 @@ export default function LiveMonitor() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         setIsStreaming(true);
+        setSelectedSource('webcam');
 
         if (canvasRef.current) {
           startProcessing(videoRef.current, canvasRef.current);
@@ -159,13 +161,90 @@ export default function LiveMonitor() {
     }
     stopProcessing();
     setIsStreaming(false);
-    toast.info('Camera stopped');
+  };
+
+  // Handle phone camera connection - receives MediaStream directly
+  const handlePhoneCameraConnect = async (stream: MediaStream) => {
+    console.log('[LiveMonitor] Phone camera stream received');
+    setPhoneStream(stream);
+    setIsPhoneConnected(true);
+    setShowPhoneCameraModal(false);
+    
+    // Stop webcam if running
+    if (isStreaming && selectedSource === 'webcam') {
+      stopCamera();
+    }
+    
+    setSelectedSource('phone');
+
+    // Set up phone video element and start processing
+    if (phoneVideoRef.current && canvasRef.current) {
+      phoneVideoRef.current.srcObject = stream;
+      await phoneVideoRef.current.play();
+      
+      // Start face detection on phone stream
+      startProcessing(phoneVideoRef.current, canvasRef.current);
+      setIsStreaming(true);
+      
+      toast.success('Phone camera connected with face detection active!');
+    }
+  };
+
+  // Disconnect phone camera
+  const disconnectPhoneCamera = () => {
+    if (phoneStream) {
+      phoneStream.getTracks().forEach(track => track.stop());
+      setPhoneStream(null);
+    }
+    if (phoneVideoRef.current) {
+      phoneVideoRef.current.srcObject = null;
+    }
+    stopProcessing();
+    setIsPhoneConnected(false);
+    setIsStreaming(false);
+    setSelectedSource('webcam');
+    toast.info('Phone camera disconnected');
+  };
+
+  // Switch video source
+  const handleSourceChange = async (source: 'webcam' | 'phone') => {
+    if (source === 'webcam') {
+      // Stop phone processing if active
+      if (isPhoneConnected && selectedSource === 'phone') {
+        stopProcessing();
+      }
+      setSelectedSource('webcam');
+      if (!isStreaming || selectedSource === 'phone') {
+        await startCamera();
+      }
+    } else if (source === 'phone') {
+      if (!isPhoneConnected) {
+        setShowPhoneCameraModal(true);
+      } else {
+        // Switch to phone stream
+        if (isStreaming && selectedSource === 'webcam') {
+          stopCamera();
+        }
+        setSelectedSource('phone');
+        
+        // Start processing phone stream
+        if (phoneVideoRef.current && canvasRef.current && phoneStream) {
+          phoneVideoRef.current.srcObject = phoneStream;
+          await phoneVideoRef.current.play();
+          startProcessing(phoneVideoRef.current, canvasRef.current);
+          setIsStreaming(true);
+        }
+      }
+    }
   };
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopCamera();
+      if (phoneStream) {
+        phoneStream.getTracks().forEach(track => track.stop());
+      }
     };
   }, []);
 
@@ -227,18 +306,29 @@ export default function LiveMonitor() {
           <div className="xl:col-span-2 space-y-4">
             <Card className="overflow-hidden">
               <div className="relative aspect-video bg-slate-900">
+                {/* Hidden video elements for processing */}
                 <video
                   ref={videoRef}
-                  className="absolute inset-0 w-full h-full object-cover hidden"
+                  className="hidden"
                   playsInline
                   muted
                   autoPlay
                 />
+                <video
+                  ref={phoneVideoRef}
+                  className="hidden"
+                  playsInline
+                  muted
+                  autoPlay
+                />
+                
+                {/* Canvas shows processed video with face detection overlays */}
                 <canvas
                   ref={canvasRef}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
 
+                {/* No camera active */}
                 {!isStreaming && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
                     <Camera className="w-16 h-16 mb-4 opacity-50" />
@@ -246,10 +336,21 @@ export default function LiveMonitor() {
                     <p className="text-sm text-white/60 mb-6">
                       Click the button below to start monitoring
                     </p>
-                    <Button size="lg" onClick={startCamera} disabled={!isModelLoaded}>
-                      <Camera className="w-5 h-5 mr-2" />
-                      {isModelLoaded ? 'Start Camera' : 'Loading AI Models...'}
-                    </Button>
+                    <div className="flex gap-3">
+                      <Button size="lg" onClick={startCamera} disabled={!isModelLoaded}>
+                        <Camera className="w-5 h-5 mr-2" />
+                        {isModelLoaded ? 'Start Webcam' : 'Loading AI Models...'}
+                      </Button>
+                      <Button 
+                        size="lg" 
+                        variant="outline" 
+                        onClick={() => setShowPhoneCameraModal(true)}
+                        className="border-white/30 text-white hover:bg-white/10"
+                      >
+                        <Smartphone className="w-5 h-5 mr-2" />
+                        Use Phone
+                      </Button>
+                    </div>
                     {!isModelLoaded && (
                       <p className="text-xs text-white/40 mt-3">Loading face detection models...</p>
                     )}
@@ -265,12 +366,18 @@ export default function LiveMonitor() {
                     >
                       <Users className="w-3 h-3 mr-1" />
                       {metrics.totalFaces} detected
+                      {selectedSource === 'phone' && (
+                        <span className="ml-2 text-blue-300">
+                          <Smartphone className="w-3 h-3 inline mr-1" />
+                          Phone
+                        </span>
+                      )}
                     </Badge>
                     <Button
                       variant="secondary"
                       size="sm"
                       className="bg-black/60 hover:bg-black/80 text-white border-0"
-                      onClick={stopCamera}
+                      onClick={selectedSource === 'phone' ? disconnectPhoneCamera : stopCamera}
                     >
                       <CameraOff className="w-4 h-4 mr-2" />
                       Stop
@@ -281,10 +388,10 @@ export default function LiveMonitor() {
                 {/* Alert overlay */}
                 {isStreaming && metrics.boredomPercentage >= alertThreshold && metrics.totalFaces > 0 && (
                   <div className="absolute top-4 left-4 right-4">
-                    <div className="bg-red-500/90 text-white px-4 py-3 rounded-lg flex items-center gap-3 animate-pulse-alert">
+                    <div className="bg-red-500/90 text-white px-4 py-3 rounded-lg flex items-center gap-3 animate-pulse">
                       <AlertTriangle className="w-5 h-5" />
                       <span className="font-medium">
-                        High disengagement detected: {metrics.boredomPercentage.toFixed(0)}%
+                        High disengagement detected: {Math.round(metrics.boredomPercentage)}%
                       </span>
                     </div>
                   </div>
@@ -293,29 +400,68 @@ export default function LiveMonitor() {
 
               {/* Video source selector */}
               <div className="p-4 border-t border-border bg-muted/30">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-4">
                     <Label className="text-sm font-medium">Video Source:</Label>
-                    <Select value={selectedSource} onValueChange={setSelectedSource}>
-                      <SelectTrigger className="w-[200px]">
+                    <Select 
+                      value={selectedSource} 
+                      onValueChange={(value) => handleSourceChange(value as 'webcam' | 'phone')}
+                    >
+                      <SelectTrigger className="w-[220px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="webcam">Built-in Webcam</SelectItem>
-                        <SelectItem value="external">External Camera</SelectItem>
-                        <SelectItem value="phone">Phone Camera</SelectItem>
+                        <SelectItem value="webcam">
+                          <div className="flex items-center gap-2">
+                            <Camera className="w-4 h-4" />
+                            Built-in Webcam
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="phone">
+                          <div className="flex items-center gap-2">
+                            <Smartphone className="w-4 h-4" />
+                            Phone Camera {isPhoneConnected && '✓'}
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowPhoneCameraModal(true)}
-                  >
-                    <Smartphone className="w-4 h-4 mr-2" />
-                    Link Phone
-                  </Button>
+                  <div className="flex gap-2">
+                    {isPhoneConnected ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={disconnectPhoneCamera}
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        <Unlink className="w-4 h-4 mr-2" />
+                        Disconnect Phone
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPhoneCameraModal(true)}
+                      >
+                        <Smartphone className="w-4 h-4 mr-2" />
+                        Link Phone
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Phone connection status */}
+                {isPhoneConnected && selectedSource === 'phone' && (
+                  <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                    <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-sm font-medium">Phone camera active with face detection</span>
+                    </div>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">
+                      AI is analyzing the video stream in real-time
+                    </p>
+                  </div>
+                )}
               </div>
             </Card>
           </div>
@@ -503,7 +649,7 @@ export default function LiveMonitor() {
                 />
                 <span className="text-sm">
                   {isProcessing 
-                    ? 'AI Processing Active' 
+                    ? `AI Processing Active${selectedSource === 'phone' ? ' (Phone)' : ''}` 
                     : isModelLoaded 
                     ? 'Waiting for camera' 
                     : 'Loading AI models...'}
@@ -518,11 +664,7 @@ export default function LiveMonitor() {
       <PhoneCameraModal
         isOpen={showPhoneCameraModal}
         onClose={() => setShowPhoneCameraModal(false)}
-        onConnect={(viewUrl) => {
-          setShowPhoneCameraModal(false);
-          setSelectedSource('phone');
-          toast.success('Phone camera linked! You can now use it as a video source.');
-        }}
+        onConnect={handlePhoneCameraConnect}
       />
     </AppLayout>
   );

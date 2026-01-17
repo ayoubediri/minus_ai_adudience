@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,44 +11,68 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Smartphone, Copy, Check, Wifi, QrCode, ExternalLink } from 'lucide-react';
+import { Smartphone, Copy, Check, Wifi, QrCode, ExternalLink, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  generatePhoneCameraLink,
-  generateQRCode,
-  PhoneCameraLinkData,
-} from '@/lib/phoneCameraLink';
+import { PhoneCameraManager } from '@/lib/webrtcPhoneCamera';
 
 interface PhoneCameraModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConnect: (viewUrl: string) => void;
+  onConnect: (stream: MediaStream) => void;
 }
 
 export function PhoneCameraModal({ isOpen, onClose, onConnect }: PhoneCameraModalProps) {
-  const [linkData, setLinkData] = useState<PhoneCameraLinkData | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [phoneUrl, setPhoneUrl] = useState<string>('');
+  const [roomId, setRoomId] = useState<string>('');
   const [status, setStatus] = useState<'waiting' | 'connecting' | 'connected'>('waiting');
   const [copied, setCopied] = useState(false);
+  
+  const managerRef = useRef<PhoneCameraManager | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      // Generate new link data
-      const data = generatePhoneCameraLink();
-      setLinkData(data);
+      // Create new manager and start listening
+      const manager = new PhoneCameraManager();
+      managerRef.current = manager;
+      
+      setRoomId(manager.getRoomId());
+      setPhoneUrl(manager.getPhoneUrl());
       setStatus('waiting');
       setCopied(false);
 
       // Generate QR code
-      generateQRCode(data.qrData).then(setQrCodeUrl).catch(console.error);
+      manager.generateQRCode().then(setQrCodeUrl).catch(console.error);
+
+      // Set up callbacks
+      manager.onStream((stream) => {
+        console.log('[PhoneCameraModal] Received video stream');
+        setStatus('connected');
+        onConnect(stream);
+        toast.success('Phone camera connected! Face detection is now active.');
+      });
+
+      manager.onDisconnect(() => {
+        console.log('[PhoneCameraModal] Connection lost');
+        setStatus('waiting');
+        toast.error('Phone camera disconnected');
+      });
+
+      // Start listening for connections
+      manager.startListening();
+
+      return () => {
+        // Don't disconnect on close if connected - let LiveMonitor handle it
+        if (status !== 'connected') {
+          manager.disconnect();
+        }
+      };
     }
   }, [isOpen]);
 
   const copyToClipboard = async () => {
-    if (!linkData) return;
-
     try {
-      await navigator.clipboard.writeText(linkData.pushUrl);
+      await navigator.clipboard.writeText(phoneUrl);
       setCopied(true);
       toast.success('Link copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
@@ -57,15 +81,15 @@ export function PhoneCameraModal({ isOpen, onClose, onConnect }: PhoneCameraModa
     }
   };
 
-  const handleConnect = () => {
-    if (!linkData) return;
-    setStatus('connected');
-    onConnect(linkData.viewUrl);
-    toast.success('Phone camera connected!');
+  const handleClose = () => {
+    if (status !== 'connected' && managerRef.current) {
+      managerRef.current.disconnect();
+    }
+    onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -73,7 +97,7 @@ export function PhoneCameraModal({ isOpen, onClose, onConnect }: PhoneCameraModa
             Link Phone as Camera
           </DialogTitle>
           <DialogDescription>
-            Use your smartphone as a wireless camera for audience monitoring
+            Use your smartphone as a wireless camera for audience monitoring with real-time face detection
           </DialogDescription>
         </DialogHeader>
 
@@ -114,7 +138,8 @@ export function PhoneCameraModal({ isOpen, onClose, onConnect }: PhoneCameraModa
                 <li>Point it at the QR code above</li>
                 <li>Tap the link that appears</li>
                 <li>Allow camera access when prompted</li>
-                <li>Click "Connect" below once streaming</li>
+                <li>Tap "Start Streaming" on your phone</li>
+                <li>The video will appear here automatically</li>
               </ol>
             </div>
           </TabsContent>
@@ -124,7 +149,7 @@ export function PhoneCameraModal({ isOpen, onClose, onConnect }: PhoneCameraModa
               <Label>Phone Camera URL</Label>
               <div className="flex gap-2">
                 <Input
-                  value={linkData?.pushUrl || ''}
+                  value={phoneUrl}
                   readOnly
                   className="font-mono text-xs"
                 />
@@ -152,7 +177,7 @@ export function PhoneCameraModal({ isOpen, onClose, onConnect }: PhoneCameraModa
                 <li>Send it to your phone (email, message, etc.)</li>
                 <li>Open the link in your phone's browser</li>
                 <li>Allow camera access when prompted</li>
-                <li>Click "Connect" below once streaming</li>
+                <li>Tap "Start Streaming"</li>
               </ol>
             </div>
           </TabsContent>
@@ -161,34 +186,39 @@ export function PhoneCameraModal({ isOpen, onClose, onConnect }: PhoneCameraModa
         {/* Connection Status */}
         <div className="flex items-center justify-between pt-4 border-t">
           <div className="flex items-center gap-2">
-            <Wifi className={`w-4 h-4 ${status === 'connected' ? 'text-green-500' : 'text-muted-foreground'}`} />
+            {status === 'connecting' ? (
+              <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+            ) : (
+              <Wifi className={`w-4 h-4 ${status === 'connected' ? 'text-green-500' : 'text-muted-foreground'}`} />
+            )}
             <span className="text-sm">Status:</span>
             <Badge
               variant={status === 'connected' ? 'default' : 'secondary'}
               className={status === 'connected' ? 'bg-green-500' : ''}
             >
-              {status === 'waiting' && 'Waiting for connection...'}
+              {status === 'waiting' && 'Waiting for phone...'}
               {status === 'connecting' && 'Connecting...'}
               {status === 'connected' && 'Connected!'}
             </Badge>
           </div>
 
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleConnect}>
-              Connect
-            </Button>
-          </div>
+          <Button variant="outline" onClick={handleClose}>
+            {status === 'connected' ? 'Done' : 'Cancel'}
+          </Button>
         </div>
 
         {/* Room ID for debugging */}
-        {linkData && (
-          <p className="text-xs text-muted-foreground text-center">
-            Room ID: {linkData.roomId}
+        <p className="text-xs text-muted-foreground text-center">
+          Room ID: {roomId}
+        </p>
+
+        {/* Important note */}
+        <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+          <p className="text-xs text-blue-700 dark:text-blue-400">
+            <strong>Note:</strong> Both devices must be on the same network for the connection to work. 
+            Face detection will automatically start once the phone stream is received.
           </p>
-        )}
+        </div>
       </DialogContent>
     </Dialog>
   );

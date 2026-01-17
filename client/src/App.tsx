@@ -10,6 +10,7 @@ import LiveMonitor from "./pages/LiveMonitor";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import VideoSources from "./pages/VideoSources";
+import PhoneCamera from "./pages/PhoneCamera";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/analytics/:sessionId" component={Analytics} />
       <Route path="/analytics-overview" component={Analytics} />
       <Route path="/sources" component={VideoSources} />
+      <Route path="/phone-camera" component={PhoneCamera} />
       <Route path="/team" component={Sessions} />
       <Route path="/settings" component={Settings} />
       <Route path="/404" component={NotFound} />

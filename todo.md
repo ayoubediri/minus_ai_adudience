@@ -113,3 +113,15 @@
 - [x] Implement multi-level alerts (critical < 40%, warning < 60%)
 - [x] Add sound alerts with different frequencies for alert levels
 - [x] Improve vibration patterns for different alert levels
+
+## Phase 12: Bug Fixes
+
+### Phone Camera Linking Fix
+- [x] Debug vdo.ninja integration - phone stream not displaying
+- [x] Fix iframe/video stream connection
+- [x] Test phone camera linking end-to-end
+
+### Phone Camera Face Detection Fix
+- [x] Implement WebRTC direct connection for phone camera stream
+- [x] Enable face detection processing on phone camera video
+- [x] Test face detection with phone camera source
