@@ -1,508 +1,474 @@
-<div dir="rtl" align="right">
+# 🎯 Audience Engagement Platform
 
-# 🔬 تقييم معماري نقدي: منصة قياس تفاعل الجمهور
+A real-time AI-powered platform that monitors audience engagement during presentations, lectures, and meetings using computer vision and facial expression analysis.
 
-> **تحليل من مهندس معماري بخبرة 15+ سنة**
-> 
-> هذا التقرير ليس مدحًا للمشروع، بل تفكيك واقعي صارم كما لو أن النظام سيُستخدم في قاعات محاضرات حقيقية مع 30-100 شخص، بإضاءة غير مثالية، ومع مستخدم غير تقني.
-
----
-
-## 📑 فهرس المحتويات
-
-1. [مكامن الخطأ الواقعية](#1️⃣-مكامن-الخطأ-الواقعية)
-2. [تحليل خوارزمية التفاعل](#2️⃣-تحليل-خوارزمية-التفاعل)
-3. [سيناريوهات الفشل الحقيقية](#3️⃣-سيناريوهات-الفشل-الحقيقية)
-4. [الخلاصة التنفيذية](#4️⃣-الخلاصة-التنفيذية)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript)
+![TensorFlow.js](https://img.shields.io/badge/TensorFlow.js-4.22-FF6F00?logo=tensorflow)
+![tRPC](https://img.shields.io/badge/tRPC-11-2596BE)
+![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?logo=mysql)
 
 ---
 
-## 1️⃣ مكامن الخطأ الواقعية
+## 📑 Table of Contents
 
-### 🔴 المشكلة #1: أداء كارثي مع تعدد الوجوه
+- [Overview](#-overview)
+- [Features](#-features)
+- [Technology Stack](#-technology-stack)
+- [Architecture](#-architecture)
+- [AI & Computer Vision](#-ai--computer-vision)
+- [Database Schema](#-database-schema)
+- [Getting Started](#-getting-started)
+- [Project Structure](#-project-structure)
+- [API Reference](#-api-reference)
+- [Configuration](#-configuration)
+- [Testing](#-testing)
+- [License](#-license)
 
-| التصنيف | |
-|---------|---|
-| 🧩 **النوع** | Computer Vision / Performance |
-| 🔥 **الشدة** | **حرجة** |
-| 🎯 **متى تظهر** | قاعة بـ 30+ شخص |
+---
 
-**الوصف:**
-```typescript
-// faceDetector.ts - السطر 65-71
-const detections = await faceapi
-  .detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions({
-    inputSize: 416,
-    scoreThreshold: 0.5,
-  }))
-  .withFaceLandmarks()
-  .withFaceExpressions();
+## 🔭 Overview
+
+The **Audience Engagement Platform** helps speakers, educators, and presenters understand their audience in real-time. By analyzing facial expressions, head poses, and behavioral cues, the system calculates an **Engagement Score** and alerts the speaker when audience attention drops below a configurable threshold.
+
+### Key Use Cases
+
+- **Education**: Monitor student engagement during lectures
+- **Corporate**: Track attention levels in meetings and training sessions
+- **Events**: Gauge audience response during presentations and conferences
+
+---
+
+## ✨ Features
+
+### 🎥 Real-Time Monitoring
+- **Live Video Analysis**: Process webcam or phone camera feeds at 10+ FPS
+- **Multi-Face Detection**: Track multiple audience members simultaneously
+- **Engagement Scoring**: Calculate individual and aggregate engagement levels (0-100%)
+
+### 🧠 AI-Powered Analysis
+- **Facial Expression Recognition**: Detect 7 emotions (happy, sad, angry, surprised, fearful, disgusted, neutral)
+- **Yawning Detection**: Using Mouth Aspect Ratio (MAR) algorithm
+- **Head Pose Estimation**: Detect when audience members look down (inattention)
+- **Engagement Classification**: Categorize as `engaged`, `neutral`, or `bored`
+
+### 📱 Multi-Source Video Input
+- **Webcam**: Direct browser camera access
+- **Phone Camera**: Connect smartphone as wireless camera via WebRTC
+- **Screen Share**: Monitor virtual meetings
+
+### 🔔 Smart Alert System
+- **Threshold Alerts**: Notify when boredom exceeds configurable percentage
+- **Multi-Channel Delivery**: Visual, sound, vibration, and push notifications
+- **Pushover Integration**: Send alerts to smartwatch/phone via Pushover API
+- **Cooldown Logic**: Prevent alert fatigue with intelligent timing
+
+### 📊 Analytics & Reports
+- **Real-Time Charts**: Live engagement graphs with Recharts
+- **Session History**: Review past sessions with detailed metrics
+- **AI-Generated Insights**: Post-session reports with recommendations
+- **Time-Series Data**: Track engagement patterns over session duration
+
+---
+
+## 🛠 Technology Stack
+
+### Frontend
+
+| Technology | Purpose |
+|------------|---------|
+| **React 19** | UI framework with latest features |
+| **TypeScript 5.9** | Type-safe development |
+| **Vite 7** | Fast build tool and dev server |
+| **TailwindCSS 4** | Utility-first styling |
+| **Framer Motion** | Smooth animations |
+| **Radix UI** | Accessible component primitives |
+| **Recharts** | Data visualization charts |
+| **Wouter** | Lightweight routing |
+| **React Hook Form + Zod** | Form handling with validation |
+| **TanStack Query** | Server state management |
+
+### Backend
+
+| Technology | Purpose |
+|------------|---------|
+| **Express.js** | HTTP server framework |
+| **tRPC 11** | End-to-end typesafe API |
+| **Socket.io** | Real-time WebSocket communication |
+| **Drizzle ORM** | Type-safe database queries |
+| **MySQL 8** | Relational database |
+| **AWS S3** | File storage (optional) |
+| **Jose** | JWT authentication |
+
+### AI & Computer Vision
+
+| Technology | Purpose |
+|------------|---------|
+| **face-api.js** | Face detection and expression recognition |
+| **TensorFlow.js 4.22** | ML runtime in browser |
+| **MediaPipe** | Advanced face/pose detection (available) |
+
+---
+
+## 🏛 Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        CLIENT (Browser)                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐   │
+│  │   Camera    │──▶│ FaceDetector│──▶│  useVideoProcessor  │   │
+│  │   Stream    │   │  (face-api) │   │     (React Hook)    │   │
+│  └─────────────┘   └─────────────┘   └──────────┬──────────┘   │
+│                                                  │              │
+│                                      ┌───────────▼───────────┐  │
+│                                      │   EngagementMetrics   │  │
+│                                      │  - totalFaces         │  │
+│                                      │  - engagedCount       │  │
+│                                      │  - boredCount         │  │
+│                                      │  - boredomPercentage  │  │
+│                                      └───────────┬───────────┘  │
+│                                                  │              │
+│  ┌─────────────┐   ┌─────────────┐   ┌──────────▼──────────┐   │
+│  │  LiveMonitor│◀──│ AlertManager│◀──│    tRPC Client      │   │
+│  │    (UI)     │   │ (Pushover)  │   │                     │   │
+│  └─────────────┘   └─────────────┘   └──────────┬──────────┘   │
+│                                                  │              │
+└──────────────────────────────────────────────────┼──────────────┘
+                                                   │
+                              ┌─────────────────────────────────────┐
+                              │            SERVER (Node.js)          │
+                              ├─────────────────────────────────────┤
+                              │                                     │
+                              │  ┌─────────────┐  ┌──────────────┐  │
+                              │  │ tRPC Router │  │  Socket.io   │  │
+                              │  │  - sessions │  │  (Signaling) │  │
+                              │  │  - users    │  │              │  │
+                              │  │  - alerts   │  │              │  │
+                              │  └──────┬──────┘  └──────────────┘  │
+                              │         │                           │
+                              │  ┌──────▼──────┐                    │
+                              │  │ Drizzle ORM │                    │
+                              │  └──────┬──────┘                    │
+                              │         │                           │
+                              └─────────┼───────────────────────────┘
+                                        │
+                              ┌─────────▼─────────┐
+                              │      MySQL        │
+                              │  - users          │
+                              │  - sessions       │
+                              │  - engagementData │
+                              │  - faceAnalysis   │
+                              │  - alerts         │
+                              └───────────────────┘
 ```
 
-- `TinyFaceDetector` مع `inputSize: 416` يستهلك ~150-300ms لكل إطار على أجهزة متوسطة
-- مع 30+ وجه + landmarks + expressions = **500-1000ms لكل إطار**
-- النتيجة: **1-2 FPS** بدلاً من 15-30 المُعلن عنها
-
-**الحل:**
-
-| المستوى | الحل |
-|---------|------|
-| ⚡ **سريع** | خفض `inputSize` إلى 224، رفع `scoreThreshold` إلى 0.6 |
-| 🔧 **متوسط** | معالجة كل 3-5 إطارات بدلاً من كل إطار |
-| 🏗️ **معماري** | Web Worker منفصل + محدد سعر إطارات ديناميكي حسب حمل CPU |
-
 ---
 
-### 🔴 المشكلة #2: False Positives كارثية في النظر للأسفل
+## 🧠 AI & Computer Vision
 
-| التصنيف | |
-|---------|---|
-| 🧩 **النوع** | Computer Vision / Algorithm |
-| 🔥 **الشدة** | **حرجة** |
-| 🎯 **متى تظهر** | أي جلسة تعليمية أو اجتماع عمل |
+### Face Detection Pipeline
 
-**الوصف:**
-```typescript
-// faceDetector.ts - السطر 147-149
-// If the ratio is small, the person is looking down
-// Normal ratio is around 0.35-0.45, looking down is < 0.3
-return noseToChingRatio < 0.28;
-```
+The system uses **face-api.js** built on TensorFlow.js with three neural networks:
 
-**المشكلة الجوهرية:**
-- شخص يكتب ملاحظات ← يُسجل "ملول" ← **-20 نقطة**
-- شخص يقرأ من لابتوب ← يُسجل "ملول" ← **-20 نقطة**
-- شخص يستخدم هاتفه لتدوين ملاحظات ← يُسجل "ملول"
+1. **TinyFaceDetector** (`inputSize: 416, scoreThreshold: 0.5`)  
+   A lightweight MobileNet-based detector for real-time face localization.
 
-**في قاعة محاضرات حقيقية:** 60%+ من الحضور ينظرون للأسفل لتدوين ملاحظات = النظام يُنذر خطأً طوال الوقت!
+2. **FaceLandmark68Net**  
+   Detects 68 facial landmarks (eyes, nose, mouth, jawline) for geometric analysis.
 
-**الحل:**
+3. **FaceExpressionNet**  
+   Classifies facial expressions into 7 categories with confidence scores:
+   - `happy`, `sad`, `angry`, `fearful`, `disgusted`, `surprised`, `neutral`
 
-| المستوى | الحل |
-|---------|------|
-| ⚡ **سريع** | رفع العتبة من 0.28 إلى 0.15 (فقط للنظر للأسفل الشديد) |
-| 🔧 **متوسط** | **Temporal Smoothing:** احتساب المتوسط لآخر 5 ثوانٍ قبل التصنيف |
-| 🏗️ **معماري** | دمج مؤشرات متعددة: النظر للأسفل + حركة القلم + سياق الوقت |
-
----
-
-### 🔴 المشكلة #3: خوارزمية التثاؤب غير دقيقة
-
-| التصنيف | |
-|---------|---|
-| 🧩 **النوع** | Computer Vision |
-| 🔥 **الشدة** | **عالية** |
-| 🎯 **متى تظهر** | أي استخدام واقعي |
-
-**الوصف:**
-```typescript
-// faceDetector.ts - السطر 127-131
-const mar = horizontalDist > 0 ? verticalDist / horizontalDist : 0;
-// MAR > 0.6 indicates yawning
-return mar > 0.6;
-```
-
-**إشكاليات:**
-- الابتسامة العريضة ← MAR مرتفع ← **يُحتسب تثاؤب!**
-- الضحك ← MAR مرتفع ← **يُحتسب تثاؤب!**
-- الكلام ← MAR متغير ← **تنبيهات عشوائية**
-- عتبة **0.6 ثابتة** لا تأخذ اختلاف أحجام الوجوه
-
-**الحل:**
-
-| المستوى | الحل |
-|---------|------|
-| ⚡ **سريع** | رفع العتبة إلى 0.75 + إضافة شرط مدة الفتحة (2+ ثانية) |
-| 🔧 **متوسط** | دمج تعبيرات الوجه: إذا `happy > 0.3` → ليس تثاؤب |
-| 🏗️ **معماري** | نموذج تثاؤب مخصص مُدرب على بيانات حقيقية |
-
----
-
-### 🟠 المشكلة #4: نظام تنبيهات بلا سياق زمني
-
-| التصنيف | |
-|---------|---|
-| 🧩 **النوع** | Product / UX |
-| 🔥 **الشدة** | **عالية** |
-| 🎯 **متى تظهر** | جلسة طويلة (45+ دقيقة) |
-
-**الوصف:**
-```typescript
-// alertManager.ts - السطر 62-64
-if (now - this.lastAlertTime < this.settings.cooldownMs) {
-  return null;
-}
-```
-
-**الإشكاليات:**
-- Cooldown ثابت 30 ثانية بغض النظر عن طول الجلسة
-- لا تفريق بين "انخفاض مؤقت" و "انهيار تفاعل حقيقي"
-- لا **تعلم تكيفي** من سلوك الجمهور المحدد
-
-**النتيجة:** تنبيهات متكررة تُفقد المتحدث ثقته بالنظام أو يتجاهلها
-
-**الحل:**
-
-| المستوى | الحل |
-|---------|------|
-| ⚡ **سريع** | Cooldown تصاعدي: 30s → 45s → 60s → 90s |
-| 🔧 **متوسط** | التنبيه فقط عند انخفاض مستمر لمدة 2+ دقيقة |
-| 🏗️ **معماري** | نظام ذكي يتعلم Baseline الجلسة في أول 5 دقائق |
-
----
-
-### 🟠 المشكلة #5: WebRTC Phone Camera بلا Fallback
-
-| التصنيف | |
-|---------|---|
-| 🧩 **النوع** | Backend / Realtime |
-| 🔥 **الشدة** | **عالية** |
-| 🎯 **متى تظهر** | شبكة غير مستقرة / NAT صعب |
-
-**الوصف:**
-```typescript
-// LiveMonitor.tsx - السطر 167-191
-const handlePhoneCameraConnect = async (stream: MediaStream) => {
-  setPhoneStream(stream);
-  setIsPhoneConnected(true);
-  // لا معالجة لانقطاع الاتصال!
-}
-```
-
-**الإشكاليات:**
-- لا **Ice Candidate** fallback عند فشل STUN/TURN
-- لا **reconnection logic** عند انقطاع الشبكة
-- لا **heartbeat** للكشف عن انقطاع الاتصال الصامت
-
-**الحل:**
-
-| المستوى | الحل |
-|---------|------|
-| ⚡ **سريع** | إضافة event listener لـ `oniceconnectionstatechange` |
-| 🔧 **متوسط** | نظام reconnection تلقائي مع exponential backoff |
-| 🏗️ **معماري** | TURN server خاص + جودة تكيفية حسب Bandwidth |
-
----
-
-### 🟠 المشكلة #6: تخزين البيانات كل 5 ثوانٍ بلا حد
-
-| التصنيف | |
-|---------|---|
-| 🧩 **النوع** | Backend / Database |
-| 🔥 **الشدة** | **متوسطة → عالية مع الوقت** |
-| 🎯 **متى تظهر** | جلسات طويلة متكررة |
-
-**الوصف:**
-```typescript
-// LiveMonitor.tsx - السطر 116-127
-const interval = setInterval(() => {
-  recordEngagementMutation.mutate({
-    // بيانات كاملة كل 5 ثوانٍ
-  });
-}, 5000);
-```
-
-**الحساب:**
-- جلسة 60 دقيقة = 720 سجل
-- 10 جلسات يوميًا = 7,200 سجل/يوم
-- 6 أشهر = **1.3 مليون سجل** → بطء استعلامات كبير
-
-**الحل:**
-
-| المستوى | الحل |
-|---------|------|
-| ⚡ **سريع** | زيادة الفترة إلى 15-30 ثانية |
-| 🔧 **متوسط** | تخزين محلي + Batch insert كل 60 ثانية |
-| 🏗️ **معماري** | TimescaleDB / InfluxDB + سياسات حذف تلقائي |
-
----
-
-### 🟡 المشكلة #7: UX المتحدث أثناء العرض
-
-| التصنيف | |
-|---------|---|
-| 🧩 **النوع** | UX / Frontend |
-| 🔥 **الشدة** | **متوسطة** |
-| 🎯 **متى تظهر** | أي عرض مباشر |
-
-**الوصف:**
-
-الواجهة الحالية (`LiveMonitor.tsx`) تتطلب من المتحدث:
-- النظر إلى شاشة المراقبة بشكل متكرر
-- قراءة أرقام ونسب مئوية أثناء الكلام
-- معالجة تنبيهات مرئية + صوتية + اهتزاز معًا
-
-**النتيجة:** تشتت المتحدث يضر بجودة العرض!
-
-**الحل:**
-
-| المستوى | الحل |
-|---------|------|
-| ⚡ **سريع** | وضع **Focus Mode**: إخفاء كل شيء إلا الحالة الحرجة |
-| 🔧 **متوسط** | تنبيه **صوتي لطيف فقط** + تفاصيل للمساعد |
-| 🏗️ **معماري** | **Companion App** للمساعد يرى كل التفاصيل |
-
----
-
-### 🟡 المشكلة #8: أمان Pushover في الواجهة الأمامية
-
-| التصنيف | |
-|---------|---|
-| 🧩 **النوع** | Security |
-| 🔥 **الشدة** | **متوسطة** |
-| 🎯 **متى تظهر** | أي استخدام |
-
-**الوصف:**
-```typescript
-// alertManager.ts - السطر 186-199
-const response = await fetch('https://api.pushover.net/1/messages.json', {
-  body: JSON.stringify({
-    token: this.settings.pushoverApiToken, // مفتاح API في الواجهة!
-    user: this.settings.pushoverUserKey,
-  }),
-});
-```
-
-**الخطر:** مفاتيح API مكشوفة في localStorage + Network tab!
-
-**الحل:**
-
-| المستوى | الحل |
-|---------|------|
-| ⚡ **سريع** | نقل استدعاء Pushover للخادم فورًا |
-| 🔧 **متوسط** | تشفير المفاتيح في الخادم + توكن مؤقت للواجهة |
-
----
-
-## 2️⃣ تحليل خوارزمية التفاعل
-
-### الخوارزمية الحالية
+### Engagement Calculation Algorithm
 
 ```typescript
-// faceDetector.ts - السطر 152-177
+// Base score starts at 100
 let score = 100;
 
-// خصومات التعبيرات السلبية
+// Expression-based adjustments
 if (expressions.sad > 0.5) score -= 20;
 if (expressions.angry > 0.5) score -= 15;
 if (expressions.neutral > 0.7) score -= 10;
-
-// مكافآت التعبيرات الإيجابية
 if (expressions.happy > 0.5) score += 15;
 if (expressions.surprised > 0.3) score += 10;
 
-// خصومات مؤشرات الملل
-if (isYawning) score -= 30;
-if (isLookingDown) score -= 20;
+// Behavioral indicators
+if (isYawning) score -= 30;      // Mouth Aspect Ratio > 0.6
+if (isLookingDown) score -= 20;  // Head pitch detection
+
+// Classification thresholds
+if (score >= 70) return 'engaged';
+if (score < 50) return 'bored';
+return 'neutral';
 ```
 
-### 📊 نقد الخوارزمية
-
-| المشكلة | الشدة | التفسير |
-|---------|-------|---------|
-| **Neutral = سلبي؟** | 🔴 حرج | التركيز العميق يظهر كـ "neutral" → -10 نقاط خطأ! |
-| **عتبات ثابتة** | 🟠 عالي | 0.5 لكل التعبيرات لا تأخذ اختلاف الأفراد |
-| **لا ذاكرة زمنية** | 🟠 عالي | كل إطار مستقل → تقلبات شديدة |
-| **لا Baseline** | 🟠 عالي | لا معرفة بـ "الطبيعي" لهذا الجمهور |
-| **False Positives** | 🔴 حرج | النظر للأسفل + neutral = 70 نقطة → "bored" خطأ! |
-
-### ✅ نموذج تفاعل مُحسَّن مقترح
+### Yawning Detection (MAR Algorithm)
 
 ```
-نموذج Multi-Signal Temporal Engagement:
+MAR = Vertical Mouth Distance / Horizontal Mouth Distance
 
-1️⃣ Baseline Calibration (أول 3 دقائق):
-   - تسجيل التوزيع الطبيعي للجمهور
-   - تعلم "neutral" كـ engaged لهذا الجمهور
+Using landmarks:
+- Vertical: distance(mouth[3], mouth[9])  // top to bottom lip
+- Horizontal: distance(mouth[0], mouth[6]) // left to right corner
 
-2️⃣ Temporal Smoothing:
-   - متوسط متحرك لآخر 30 ثانية
-   - تجاهل التقلبات القصيرة (< 5 ثوانٍ)
+MAR > 0.6 → Yawning detected
+```
 
-3️⃣ Context-Aware Scoring:
-   - إذا (سياق = محاضرة تعليمية):
-     - النظر للأسفل = محايد (وليس سلبي)
-   - إذا (سياق = ورشة تفاعلية):
-     - النظر للأسفل = سلبي
+### Looking Down Detection
 
-4️⃣ Group Dynamics:
-   - إذا 80%+ نظروا للأسفل معًا → المتحدث طلب منهم شيئًا
-   - لا تنبيه، انتظر 2 دقيقة
-
-5️⃣ Trend-Based Alerting:
-   - التنبيه على الاتجاه وليس القيمة اللحظية
-   - "انخفض التفاعل 20% في آخر 5 دقائق"
+```
+Uses nose and jaw landmarks to estimate head pitch:
+- noseToChingRatio = (chin.y - noseTip.y) / faceHeight
+- Ratio < 0.28 → Looking down (potential inattention)
 ```
 
 ---
 
-## 3️⃣ سيناريوهات الفشل الحقيقية
+## 🗄 Database Schema
 
-### السيناريو #1: الإضاءة الخلفية
-
-```
-📍 الموقف: نافذة خلف الجمهور في الصباح
-
-❌ ما سيحدث حاليًا:
-   - face-api.js يفشل في اكتشاف 60%+ من الوجوه
-   - الوجوه المكتشفة = ظلال → تعبيرات خاطئة
-   - نسبة "ملل" عالية جدًا خطأ
-
-✅ الإصلاح المطلوب:
-   - كاشف جودة إضاءة قبل بدء الجلسة
-   - تنبيه: "الإضاءة غير مناسبة، يرجى تعديل الكاميرا"
-   - Adaptive contrast preprocessing
-```
-
-### السيناريو #2: تدوين الملاحظات
+### Entity Relationship Diagram
 
 ```
-📍 الموقف: محاضرة أكاديمية، 80% يدونون
-
-❌ ما سيحدث حاليًا:
-   - 80% ينظرون للأسفل
-   - نظام النقاط: 80 - 20 = 60 لكل شخص
-   - "bored" لـ 80% من الجمهور = تنبيهات متكررة!
-
-✅ الإصلاح المطلوب:
-   - "وضع المحاضرة" يُخفض وزن النظر للأسفل
-   - Baseline calibration للسلوك الطبيعي
-   - تنبيه فقط عند تغير جذري (20%+ تراجع)
+┌─────────────┐       ┌──────────────────┐       ┌─────────────────┐
+│    users    │       │     sessions     │       │ engagementData  │
+├─────────────┤       ├──────────────────┤       ├─────────────────┤
+│ id (PK)     │◀──────│ speakerId (FK)   │       │ id (PK)         │
+│ openId      │       │ id (PK)          │◀──────│ sessionId (FK)  │
+│ name        │       │ title            │       │ timestamp       │
+│ email       │       │ description      │       │ totalFaces      │
+│ role        │       │ status           │       │ boredCount      │
+│ loginMethod │       │ alertThreshold   │       │ engagedCount    │
+│ lastSignedIn│       │ startTime        │       │ boredomPercentage│
+└─────────────┘       │ endTime          │       └─────────────────┘
+       │              └──────────────────┘
+       │                      │
+       │              ┌───────┴───────┐
+       ▼              ▼               ▼
+┌──────────────┐  ┌────────────┐  ┌──────────────┐
+│notification  │  │   alerts   │  │ faceAnalysis │
+│Preferences   │  ├────────────┤  ├──────────────┤
+├──────────────┤  │ id (PK)    │  │ id (PK)      │
+│ userId (FK)  │  │ sessionId  │  │ sessionId    │
+│ enableSound  │  │ userId     │  │ faceIndex    │
+│ enableVisual │  │ alertType  │  │ emotionLabel │
+│ enablePush   │  │ message    │  │ isYawning    │
+└──────────────┘  │ delivered  │  │ isLookingDown│
+                  └────────────┘  │engagementScore│
+                                  └──────────────┘
 ```
 
-### السيناريو #3: كاميرا هاتف مهتزة
+### Tables Summary
 
+| Table | Purpose |
+|-------|---------|
+| `users` | User accounts with OAuth (openId) |
+| `sessions` | Presentation/meeting sessions |
+| `sessionAssistants` | Team members receiving alerts |
+| `notificationPreferences` | Per-user alert settings |
+| `engagementData` | Aggregated metrics per timestamp |
+| `faceAnalysis` | Individual face detection records |
+| `alerts` | Alert history and delivery status |
+| `sessionReports` | AI-generated post-session summaries |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** 20+
+- **pnpm** 10+
+- **MySQL** 8+
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/audience-engagement-platform.git
+cd audience-engagement-platform
+
+# Install dependencies
+pnpm install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your database credentials
+
+# Run database migrations
+pnpm db:push
+
+# Start development server
+pnpm dev
 ```
-📍 الموقف: ربط هاتف ممسوك باليد
 
-❌ ما سيحدث حاليًا:
-   - landmarks تتذبذب بشدة
-   - MAR و head pitch قراءات فوضوية
-   - تنبيهات عشوائية كل 30 ثانية
+### Environment Variables
 
-✅ الإصلاح المطلوب:
-   - كاشف استقرار الكاميرا
-   - تنبيه: "ثبّت الهاتف على حامل للقراءات الدقيقة"
-   - رفض الإطارات ذات Motion blur > عتبة
-```
-
-### السيناريو #4: تأخير WebRTC
-
-```
-📍 الموقف: شبكة بطيئة / مزدحمة
-
-❌ ما سيحدث حاليًا:
-   - فيديو متقطع (frames مفقودة)
-   - face detection على إطارات قديمة
-   - تأخير 3-10 ثوانٍ في التنبيهات
-   - لا تنبيه عند انقطاع الاتصال
-
-✅ الإصلاح المطلوب:
-   - عرض "جودة الاتصال" للمستخدم
-   - jitter buffer تكيفي
-   - heartbeat كل 5 ثوانٍ + reconnection تلقائي
-```
-
-### السيناريو #5: جمهور متنوع (أعمار/ثقافات)
-
-```
-📍 الموقف: مؤتمر دولي
-
-❌ ما سيحدث حاليًا:
-   - face-api.js أقل دقة على بعض أنواع الوجوه
-   - تعبيرات ثقافية مختلفة (neutral الآسيوي ≠ neutral الغربي)
-   - عتبات ثابتة لا تعمل
-
-✅ الإصلاح المطلوب:
-   - نماذج مدربة على تنوع ديموغرافي
-   - Baseline لكل جمهور في أول 5 دقائق
-   - اختياري: تحديد نوع الجمهور يدويًا
+```env
+DATABASE_URL=mysql://user:password@localhost:3306/audience_db
+OWNER_OPEN_ID=your-admin-user-id
 ```
 
 ---
 
-## 4️⃣ الخلاصة التنفيذية
+## 📁 Project Structure
 
-### 🚫 ما يمنع النجاح التجاري
-
-| # | العائق | السبب |
-|---|--------|-------|
-| 1 | **False Positives المتكررة** | المستخدم سيفقد الثقة في أسبوع |
-| 2 | **الأداء مع 30+ شخص** | لن يعمل في القاعات الكبيرة |
-| 3 | **تشتت المتحدث** | UX غير مصمم للاستخدام أثناء العرض |
-| 4 | **لا Baseline/تعلم** | نتائج غير قابلة للمقارنة بين الجلسات |
+```
+├── client/                    # Frontend React application
+│   ├── public/
+│   │   └── models/           # face-api.js model weights
+│   └── src/
+│       ├── components/       # Reusable UI components
+│       │   ├── ui/          # Radix-based primitives
+│       │   ├── AIChatBox.tsx
+│       │   ├── PhoneCameraModal.tsx
+│       │   └── PushoverSettings.tsx
+│       ├── hooks/
+│       │   ├── useVideoProcessor.ts    # Main AI processing hook
+│       │   └── useComposition.ts
+│       ├── lib/
+│       │   ├── faceDetector.ts         # Face detection class
+│       │   ├── alertManager.ts         # Alert system
+│       │   └── webrtcPhoneCamera.ts    # Phone camera WebRTC
+│       ├── pages/
+│       │   ├── LiveMonitor.tsx         # Main monitoring UI
+│       │   ├── Analytics.tsx           # Charts & reports
+│       │   ├── Sessions.tsx            # Session management
+│       │   ├── Settings.tsx            # User preferences
+│       │   └── VideoSources.tsx        # Camera selection
+│       └── contexts/
+│           └── ThemeContext.tsx
+│
+├── server/                    # Backend Node.js application
+│   ├── _core/                # Core utilities
+│   │   ├── index.ts          # Express server setup
+│   │   ├── trpc.ts           # tRPC configuration
+│   │   ├── llm.ts            # LLM integration
+│   │   └── signaling.ts      # WebRTC signaling
+│   ├── db.ts                 # Database operations
+│   ├── routers.ts            # tRPC routers
+│   ├── signaling.ts          # Socket.io handlers
+│   └── storage.ts            # File storage (S3)
+│
+├── drizzle/                   # Database schema & migrations
+│   ├── schema.ts             # Table definitions
+│   └── migrations/           # SQL migration files
+│
+├── shared/                    # Shared types (client & server)
+│
+├── package.json
+├── vite.config.ts
+├── drizzle.config.ts
+└── tsconfig.json
+```
 
 ---
 
-### ⚡ أول 3 تحسينات قبل أي إطلاق
+## 📡 API Reference
 
-#### 1️⃣ إصلاح خوارزمية التفاعل (أسبوع واحد)
+### tRPC Endpoints
 
-```diff
-- النظر للأسفل = -20 نقطة دائمًا
-+ النظر للأسفل المستمر 10+ ثوانٍ = -10 نقطة فقط
+#### Sessions
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `sessions.create` | Mutation | Create new session |
+| `sessions.getById` | Query | Get session details |
+| `sessions.getBySpeaker` | Query | List speaker's sessions |
+| `sessions.updateStatus` | Mutation | Update session status |
+| `sessions.updateAlertThreshold` | Mutation | Set alert threshold |
 
-- التثاؤب = MAR > 0.6
-+ التثاؤب = MAR > 0.75 + مدة > 2 ثانية + !happy
+#### Engagement
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `engagement.record` | Mutation | Save engagement data point |
+| `engagement.getBySession` | Query | Get session metrics |
+| `engagement.getInRange` | Query | Get metrics in time range |
 
-- Neutral = -10 نقطة
-+ Neutral = 0 نقطة (محايد فعلًا!)
+#### Alerts
+| Procedure | Type | Description |
+|-----------|------|-------------|
+| `alerts.create` | Mutation | Create new alert |
+| `alerts.markDelivered` | Mutation | Mark alert as sent |
+| `alerts.getBySession` | Query | Get session alerts |
 
-+ إضافة: Temporal smoothing (متوسط 30 ثانية)
-+ إضافة: Baseline calibration أول 3 دقائق
+---
+
+## ⚙ Configuration
+
+### Alert Settings
+
+```typescript
+interface AlertSettings {
+  enabled: boolean;
+  threshold: number;           // 0-100, default: 40
+  cooldownMs: number;          // Minimum time between alerts
+  enableVibration: boolean;
+  enableSound: boolean;
+  enableVisual: boolean;
+  pushoverApiToken?: string;   // For push notifications
+  pushoverUserKey?: string;
+}
 ```
 
-#### 2️⃣ تحسين الأداء (3-5 أيام)
+### Video Processing
 
-```diff
-- معالجة كل إطار
-+ معالجة كل 3 إطارات
+```typescript
+// In useVideoProcessor.ts
+const PROCESSING_INTERVAL = 100; // Process every 100ms (~10 FPS)
 
-- inputSize: 416
-+ inputSize: 224-320 تكيفي حسب عدد الوجوه
-
-+ إضافة: Web Worker للمعالجة
-+ إضافة: مؤشر FPS مرئي للمستخدم
-```
-
-#### 3️⃣ Focus Mode للمتحدث (2-3 أيام)
-
-```diff
-+ وضع بسيط: دائرة خضراء/صفراء/حمراء فقط
-+ تنبيه صوتي لطيف كل 5 دقائق كحد أقصى
-+ إرسال التفاصيل للمساعد فقط
-+ زر "أنا أعرف" لإخفاء التنبيهات مؤقتًا
+// In faceDetector.ts
+const detectorOptions = {
+  inputSize: 416,           // Detection resolution
+  scoreThreshold: 0.5,      // Minimum confidence
+};
 ```
 
 ---
 
-### ❓ هل النظام جاهز للاستخدام الحقيقي؟
+## 🧪 Testing
 
-## 🔴 لا. ليس بعد.
+```bash
+# Run all tests
+pnpm test
 
-**الأسباب:**
+# Run specific test file
+pnpm vitest run server/engagement.test.ts
+```
 
-1. **دقة الخوارزمية:** 40-60% False Positives بالتقدير المتحفظ
-2. **الأداء:** غير قابل للاستخدام مع 30+ شخص على أجهزة متوسطة
-3. **تجربة المستخدم:** تشتت المتحدث بدلاً من مساعدته
-4. **لا اختبار ميداني:** لم يُختبر في قاعات حقيقية
+### Test Files
 
-**متى يصبح جاهزًا؟**
-
-بعد تنفيذ التحسينات الثلاثة أعلاه + اختبار ميداني مع:
-- 3 قاعات مختلفة الحجم
-- 3 أنواع إضاءة مختلفة
-- 3 أنواع جمهور مختلفة
-- جمع ملاحظات من 10+ متحدثين حقيقيين
-
-**الوقت المقدر للجاهزية:** 4-6 أسابيع عمل مركز.
+| File | Coverage |
+|------|----------|
+| `engagement.test.ts` | Engagement data recording |
+| `sessions.test.ts` | Session CRUD operations |
+| `phoneCamera.test.ts` | WebRTC phone connection |
+| `signaling.test.ts` | Socket.io signaling |
+| `fidgetIndex.test.ts` | Engagement algorithm |
 
 ---
 
-> **ملاحظة ختامية:**
-> 
-> المشروع يحتوي على أساس تقني جيد (React 19, tRPC, face-api.js). المشكلة ليست في الأدوات، بل في الافتراضات غير الواقعية حول كيفية ظهور "الملل" وكيفية استخدام النظام أثناء العرض.
-> 
-> **النصيحة الأهم:** اختبر مع متحدثين حقيقيين قبل كتابة أي كود إضافي.
+## 📄 License
 
-</div>
+MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📧 Support
+
+For questions and support, please open an issue on GitHub.
+
+---
+
+**Built with ❤️ for better audience engagement**
